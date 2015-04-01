@@ -3,6 +3,7 @@ package gtfs
 import (
 	"encoding/csv"
 	"io"
+	logger "log"
 	"os"
 	"path"
 	"sort"
@@ -10,21 +11,10 @@ import (
 	"strings"
 )
 
-type Feed struct {
-	Dir             string
-	Routes          map[string]*Route
-	Shapes          map[string]*Shape
-	Stops           map[string]*Stop
-	Trips           map[string]*Trip
-	CalendarEntries map[string]CalendarEntry
-}
+var (
+	log = logger.New(os.Stderr, "", logger.LstdFlags)
+)
 
-type Route struct {
-	Id        string
-	ShortName string
-	LongName  string
-	Trips     []*Trip
-}
 
 type Trip struct {
 	Id        string
@@ -60,7 +50,7 @@ type StopTime struct {
 	Time int
 	Seq  int
 }
-
+33
 type CalendarEntry struct {
 	ServiceId string
 	Days      []string
@@ -85,9 +75,10 @@ func (a CoordBySeq) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a CoordBySeq) Less(i, j int) bool { return a[i].Seq < a[j].Seq }
 
 // main utility function for reading GTFS files
-func (feed *Feed) readCsv(filename string, f func([]string)) {
+func (feed *FeedInfo) readCsv(filename string, f func([]string)) {
 	file, err := os.Open(path.Join(feed.Dir, filename))
 	if err != nil {
+		log.Fatal(err)
 	}
 	defer file.Close()
 	reader := csv.NewReader(file)
@@ -102,14 +93,15 @@ func (feed *Feed) readCsv(filename string, f func([]string)) {
 		if err == io.EOF {
 			break
 		} else if err != nil {
+			log.Panicln(err)
 		} else {
 			f(record)
 		}
 	}
 }
 
-func Load(feed_path string, loadStopTimes bool) Feed {
-	f := Feed{Dir: feed_path}
+func Load(feed_path string, loadStopTimes bool) FeedInfo {
+	f := FeedInfo{Dir: feed_path}
 	f.Routes = make(map[string]*Route)
 	f.Shapes = make(map[string]*Shape)
 	f.Stops = make(map[string]*Stop)
@@ -148,12 +140,7 @@ func Load(feed_path string, loadStopTimes bool) Feed {
 		sort.Sort(CoordBySeq(v.Coords))
 	}
 
-	f.readCsv("routes.txt", func(s []string) {
-		rsn := strings.TrimSpace(s[2])
-		rln := strings.TrimSpace(s[3])
-		id := strings.TrimSpace(s[0])
-		f.Routes[id] = &Route{Id: id, ShortName: rsn, LongName: rln}
-	})
+	f.readCsv("routes.txt", f.loadRoute)
 
 	f.readCsv("trips.txt", func(s []string) {
 		route_id := s[0]
@@ -207,101 +194,11 @@ func Load(feed_path string, loadStopTimes bool) Feed {
 	return f
 }
 
-func (feed *Feed) RouteByShortName(shortName string) *Route {
-	for _, v := range feed.Routes {
-		if v.ShortName == shortName {
-			return v
-		}
-	}
-	//TODO error here
-	return &Route{}
-}
-
-// get All shapes for a route
-func (route Route) Shapes() []*Shape {
-	// collect the unique list of shape pointers
-	hsh := make(map[*Shape]bool)
-
-	for _, v := range route.Trips {
-		hsh[v.Shape] = true
-	}
-
-	retval := []*Shape{}
-	for k, _ := range hsh {
-		retval = append(retval, k)
-	}
-	return retval
-}
-
-func (route Route) LongestShape() *Shape {
-	max := 0
-	var shape *Shape
-	for _, s := range route.Shapes() {
-		if len(s.Coords) > max {
-			shape = s
-			max = len(s.Coords)
-		}
-	}
-	return shape
-}
-
 func Hmstoi(str string) int {
 	components := strings.Split(str, ":")
 	hour, _ := strconv.Atoi(components[0])
 	min, _ := strconv.Atoi(components[1])
 	sec, _ := strconv.Atoi(components[2])
 	retval := hour*60*60 + min*60 + sec
-	return retval
-}
-
-func (route Route) Stops() []*Stop {
-	stops := make(map[*Stop]bool)
-	// can't assume the longest shape includes all stops
-
-	for _, t := range route.Trips {
-		for _, st := range t.StopTimes {
-			stops[st.Stop] = true
-		}
-	}
-
-	retval := []*Stop{}
-	for k, _ := range stops {
-		retval = append(retval, k)
-	}
-	return retval
-}
-
-func (route Route) Headsigns() []string {
-	max0 := 0
-	maxHeadsign0 := ""
-	max1 := 1
-	maxHeadsign1 := ""
-
-	for _, t := range route.Trips {
-		if t.Direction == "0" {
-			if len(t.Shape.Coords) > max0 {
-				max0 = len(t.Shape.Coords)
-				maxHeadsign0 = strings.TrimSpace(t.Headsign)
-			}
-		} else { // direction == 1. only bidirectional
-			if len(t.Shape.Coords) > max1 {
-				max1 = len(t.Shape.Coords)
-				maxHeadsign1 = strings.TrimSpace(t.Headsign)
-			}
-		}
-	}
-
-	return []string{maxHeadsign0, maxHeadsign1}
-}
-
-func (feed Feed) Calendar() []string {
-	retval := []string{}
-	for i := 0; i <= 6; i++ {
-		for k, v := range feed.CalendarEntries {
-			if v.Days[i] == "1" {
-				retval = append(retval, k)
-			}
-		}
-	}
 	return retval
 }
