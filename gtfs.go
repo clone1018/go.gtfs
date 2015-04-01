@@ -16,18 +16,6 @@ var (
 )
 
 
-type Trip struct {
-	Id        string
-	Shape     *Shape
-	Route     *Route
-	Service   string
-	Direction string
-	Headsign  string
-
-	// may not be loaded
-	StopTimes []StopTime
-}
-
 type Headsign struct {
 	Direction string
 	Text      string
@@ -38,29 +26,10 @@ type Shape struct {
 	Coords []Coord
 }
 
-type Stop struct {
-	Id    string
-	Name  string
-	Coord Coord
-}
-
-type StopTime struct {
-	Stop *Stop
-	Trip *Trip
-	Time int
-	Seq  int
-}
-33
 type CalendarEntry struct {
 	ServiceId string
 	Days      []string
 }
-
-type StopTimeBySeq []StopTime
-
-func (a StopTimeBySeq) Len() int           { return len(a) }
-func (a StopTimeBySeq) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a StopTimeBySeq) Less(i, j int) bool { return a[i].Seq < a[j].Seq }
 
 type Coord struct {
 	Lat float64

@@ -7,8 +7,10 @@ import (
 //Transit routes. A route is a group of trips that are displayed to riders as a single service.
 type Route struct {
 	Id        string
+	Agency Agency
 	ShortName string
 	LongName  string
+	Desc string
 
 	// The route_type field describes the type of transportation used on a route. Valid values for this field are:
 	// 0 - Tram, Streetcar, Light rail. Any light rail or street level system within a metropolitan area.
@@ -94,7 +96,7 @@ func (route Route) Headsigns() []string {
 	return []string{maxHeadsign0, maxHeadsign1}
 }
 
-func (f Feed) loadRoute(s []string) {
+func (f FeedInfo) loadRoute(s []string) {
 	rsn := strings.TrimSpace(s[2])
 	rln := strings.TrimSpace(s[3])
 	id := strings.TrimSpace(s[0])
